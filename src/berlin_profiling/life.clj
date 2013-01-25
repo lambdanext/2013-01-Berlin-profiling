@@ -1,5 +1,6 @@
 (ns berlin-profiling.life
-  (:require [quil "1.6.0"]))
+  (:require [quil.core :as q]
+            [clojure.core.reducers :as r]))
 
 ; a cell
 {:x 1 :y 2} ; [1 2]
@@ -18,13 +19,15 @@
 ; or
 (gen cell))
 
+(defrecord Cell [x y])
+
 ; computing neighbours
 (defn neighbours [{:keys [x y]}]
   (for [nx (range (dec x) (+ x 2))
         ny (range (dec y) (+ y 2))
         :when (or (not= nx x)
                    (not= ny y))]
-    {:x nx :y ny}))
+    (Cell. nx ny)))
 
 ; Any live cell with fewer than two live neighbours dies, as if caused by under-population.
 ; Any live cell with two or three live neighbours lives on to the next generation.
@@ -39,12 +42,13 @@
      :post [(set? %)]}
     (let [fs (frequencies 
                (mapcat neighbours cells))]
-      (set 
-        (for [[cell n] fs
-              :when (if (cells cell)
-                      (survive? n)
-                      (spawn? n))]
-          cell)))))
+      (into #{}
+        (->> fs 
+          (r/filter (fn [[cell n]]
+                (if (cells cell)
+                  (survive? n)
+                  (spawn? n))))
+          (r/map key))))))
 
 (def step (stepper neighbours #{2 3} #{3}))
 
@@ -54,7 +58,7 @@
 (defn setup []
   (q/no-stroke)
   (q/no-smooth)
-  (q/frame-rate 60)                    ;;Set framerate to 1 FPS
+  (q/frame-rate 15)                    ;;Set framerate to 1 FPS
   (q/background 0 0 255))                 ;;Set the background colour to
                                     ;;  a nice shade of grey.
 (defn draw []
@@ -72,8 +76,9 @@
 (reset! world
   (set (repeatedly (/ (* start-range start-range) 4)
                    (fn []
-                     {:x (rand-int start-range)
-                      :y (rand-int start-range)}))))
+                     (map->Cell {:x (rand-int start-range)
+                                 :y (rand-int start-range)})))))
 
+(def stop (atom true))
 (def stop (atom false))
-(def f (future (while (not @stop) (swap! world step))))
+#_(def f (future (while (not @stop) (swap! world step))))
