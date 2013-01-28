@@ -22,12 +22,14 @@
 (defrecord Cell [x y])
 
 ; computing neighbours
+(def deltas [-1 0 1])
+
 (defn neighbours [{:keys [x y]}]
-  (for [nx (range (dec x) (+ x 2))
-        ny (range (dec y) (+ y 2))
-        :when (or (not= nx x)
-                   (not= ny y))]
-    (Cell. nx ny)))
+  (->> deltas
+    (r/mapcat (fn [dx]
+              (->> deltas
+                (r/filter (fn [dy] (not= 0 dy dx)))
+                (r/map (fn [dy] (Cell. (+ x dx) (+ y dy)))))))))
 
 ; Any live cell with fewer than two live neighbours dies, as if caused by under-population.
 ; Any live cell with two or three live neighbours lives on to the next generation.
@@ -41,7 +43,7 @@
     {:pre [(set? cells)]
      :post [(set? %)]}
     (let [fs (frequencies 
-               (mapcat neighbours cells))]
+               (r/mapcat neighbours cells))]
       (into #{}
         (->> fs 
           (r/filter (fn [[cell n]]
